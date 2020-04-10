@@ -1,27 +1,34 @@
 const express = require('express')
-const app = express()
+require('express-async-errors')
 const cors = require('cors')
+const mongoose = require('mongoose')
 const blogRouter = require('./controllers/blog')
+const userRouter = require('./controllers/user')
+const loginRouter = require('./controllers/login')
 const logger = require('./utils/logging')
 const middleware = require('./utils/middleware')
 const config = require('./utils/config')
-const mongoose = require('mongoose')
+
+const app = express()
 
 logger.info('connecting to', config.DB_URI)
 
+mongoose.set('useCreateIndex', true)
 mongoose.connect(config.DB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(() => {
-        logger.info('connected to MongoDB')
-    })
-    .catch(error => {
-        logger.error("error connecting to MongoDB:", error)
-    })
+  .then(() => {
+    logger.info('connected to MongoDB')
+  })
+  .catch((error) => {
+    logger.error('error connecting to MongoDB:', error)
+  })
 
 app.use(cors())
 app.use(express.json())
 app.use(middleware.requestLogger)
 
 app.use('/api/blogs', blogRouter)
+app.use('/api/users', userRouter)
+app.use('/login', loginRouter)
 
 app.use(middleware.unknownEndpoint)
 app.use(middleware.errorHandler)
