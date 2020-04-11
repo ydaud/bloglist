@@ -29,7 +29,7 @@ blogRouter.post('/', async (request, response) => {
     return response.status(400).send({ error: 'missing title or url' })
   }
 
-  const user = await User.findById(body.user)
+  const user = await User.findById(decodedToken.id)
 
   const blog = new Blog({
     title: body.title,
@@ -40,6 +40,10 @@ blogRouter.post('/', async (request, response) => {
   })
 
   const saveResult = await blog.save()
+  saveResult._doc.user = {
+    username: user.username,
+    name: user.name,
+  }
 
   user.blogs = user.blogs.concat(saveResult._id)
   await user.save()
@@ -69,8 +73,17 @@ blogRouter.delete('/:id', async (request, response) => {
 blogRouter.put('/:id', async (request, response) => {
   const { id } = request.params
   const { body } = request
+  const token = getToken(request)
+
+  const decodedToken = jwt.verify(token, process.env.SECRET)
+  if (!token || !decodedToken.id) {
+    return response.status(401).json({ error: 'token missing or invalid' })
+  }
+
+  const user = await User.findById(decodedToken.id)
 
   const blog = {
+    user: user._id,
     title: body.title,
     author: body.author,
     url: body.url,
@@ -78,6 +91,11 @@ blogRouter.put('/:id', async (request, response) => {
   }
 
   const updateResult = await Blog.findByIdAndUpdate(id, blog, { new: true })
+  updateResult._doc.user = {
+    username: user.username,
+    name: user.name,
+  }
+
   response.status(201).json(updateResult)
 })
 
