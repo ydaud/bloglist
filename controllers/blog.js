@@ -12,7 +12,9 @@ const getToken = (request) => {
 }
 
 blogRouter.get('/', async (request, response) => {
-  const blogs = await Blog.find({}).populate('user', { username: 1, name: 1 })
+  const blogs = await Blog.find({})
+    .populate('user', { username: 1, name: 1 })
+
   response.json(blogs)
 })
 
@@ -39,11 +41,9 @@ blogRouter.post('/', async (request, response) => {
     user: user._id,
   })
 
-  const saveResult = await blog.save()
-  saveResult._doc.user = {
-    username: user.username,
-    name: user.name,
-  }
+  const res = await blog.save()
+  const saveResult = await Blog.findById(res._id)
+    .populate('user', { username: 1, name: 1 })
 
   user.blogs = user.blogs.concat(saveResult._id)
   await user.save()
@@ -70,9 +70,31 @@ blogRouter.delete('/:id', async (request, response) => {
   response.status(204).end()
 })
 
+blogRouter.post('/:id/comments', async (request, response) => {
+  const { id } = request.params
+  const { body } = request
+  const blog = await Blog.findById(id)
+
+  const updatedBlog = {
+    user: blog.user,
+    title: blog.title,
+    author: blog.author,
+    url: blog.url,
+    likes: blog.likes,
+    comments: blog.comments.concat(body.comment),
+  }
+
+  const res = await Blog.findByIdAndUpdate(id, updatedBlog, { new: true })
+  const updateResult = await Blog.findById(res._id)
+    .populate('user', { username: 1, name: 1 })
+
+  response.json(updateResult)
+})
+
 blogRouter.put('/:id', async (request, response) => {
   const { id } = request.params
   const { body } = request
+  console.log(body)
   const token = getToken(request)
 
   const decodedToken = jwt.verify(token, process.env.SECRET)
@@ -80,21 +102,20 @@ blogRouter.put('/:id', async (request, response) => {
     return response.status(401).json({ error: 'token missing or invalid' })
   }
 
-  const user = await User.findById(decodedToken.id)
+  const user = await User.find({ username: body.user.username })
+  console.log(user[0])
 
   const blog = {
-    user: user._id,
+    user: user[0]._id,
     title: body.title,
     author: body.author,
     url: body.url,
     likes: body.likes || 0,
   }
 
-  const updateResult = await Blog.findByIdAndUpdate(id, blog, { new: true })
-  updateResult._doc.user = {
-    username: user.username,
-    name: user.name,
-  }
+  const res = await Blog.findByIdAndUpdate(id, blog, { new: true })
+  const updateResult = await Blog.findById(res._id)
+    .populate('user', { username: 1, name: 1 })
 
   response.status(201).json(updateResult)
 })
